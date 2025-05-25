@@ -2,6 +2,51 @@ import pygame
 from collections import deque
 from settings import TILE_SIZE, WHITE, BLACK, RED, YELLOW, GOOD_ECHO_LAG_FRAMES
 
+class EnemySpriteManager:
+    def __init__(self):
+        self.sprite_sheet = pygame.image.load("assets/img/enemy.png").convert_alpha()
+        self.frame_width = 32
+        self.frame_height = 32
+        self.frames_per_row = 10
+        self.directions = ["down", "up", "right", "left"]
+        self.row_map = {
+            "down": 0,
+            "up": 32,
+            "right": 64,
+            "left": 96,
+        }
+        self.animations = {}
+        scale = 2  # Scale enemy sprites 2x
+        for dir_name in self.directions:
+            y = self.row_map[dir_name]
+            frames = []
+            for i in range(self.frames_per_row):
+                rect = pygame.Rect(i * self.frame_width, y, self.frame_width, self.frame_height)
+                frame = self.sprite_sheet.subsurface(rect)
+                frame = pygame.transform.scale(frame, (self.frame_width * scale, self.frame_height * scale))
+                frames.append(frame)
+            self.animations[dir_name] = frames
+
+    def get_frame(self, direction, frame_idx):
+        return self.animations[direction][frame_idx % self.frames_per_row]
+
+def get_direction_from_path(path, idx):
+    # Returns "down", "up", "right", or "left" based on movement vector
+    if len(path) < 2:
+        return "down"
+    if idx == 0:
+        prev = path[0]
+        curr = path[1] if len(path) > 1 else path[0]
+    else:
+        prev = path[idx - 1]
+        curr = path[idx]
+    dx = curr.x - prev.x
+    dy = curr.y - prev.y
+    if abs(dx) > abs(dy):
+        return "right" if dx > 0 else "left"
+    else:
+        return "down" if dy > 0 else "up"
+
 class EchoManager:
     def __init__(self):
         self.echoes = []
@@ -19,6 +64,12 @@ class EchoManager:
 
         self.freeze_bad_echoes = False
         self.freeze_timer = 0
+
+        # --- Enemy sprite animation ---
+        self.enemy_sprites = EnemySpriteManager()
+        self.enemy_anim_timer = 0
+        self.enemy_anim_delay = 6  # Adjust for animation speed
+        self.enemy_anim_frame = 0
 
     def start_good_echo(self, duration_base, duration_increment):
         self.good_echo_active = True
@@ -104,6 +155,13 @@ class EchoManager:
                 new_buffers.append(buffer)
         self.echo_buffers = new_buffers
 
+        # --- Animate enemy (bad echo) frames ---
+        if not self.freeze_bad_echoes:
+            self.enemy_anim_timer += 1
+            if self.enemy_anim_timer >= self.enemy_anim_delay:
+                self.enemy_anim_timer = 0
+                self.enemy_anim_frame = (self.enemy_anim_frame + 1) % self.enemy_sprites.frames_per_row
+
         # Update and draw echoes
         surviving_echoes = []
         surviving_frames = []
@@ -113,8 +171,14 @@ class EchoManager:
                 index = self.echo_frames[i] % len(path)
                 echo_pos = path[index]
 
-                # Draw echoes
-                pygame.draw.rect(screen, RED, (*echo_pos, TILE_SIZE, TILE_SIZE))
+                # --- Animated enemy sprite instead of rectangle ---
+                direction = get_direction_from_path(path, index)
+                frame_idx = self.enemy_anim_frame
+                frame = self.enemy_sprites.get_frame(direction, frame_idx)
+                # Center the 4x sprite on the echo position (TILE_SIZE square)
+                sprite_rect = frame.get_rect()
+                sprite_rect.center = (echo_pos.x + TILE_SIZE // 2, echo_pos.y + TILE_SIZE // 2)
+                screen.blit(frame, sprite_rect)
 
                 # Only advance frame if not frozen
                 if not self.freeze_bad_echoes:
