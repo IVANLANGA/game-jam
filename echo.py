@@ -16,12 +16,19 @@ class EchoManager:
         self.good_echo_current_duration = None
         self.good_echo_lag_queue = deque()
 
+        self.freeze_bad_echoes = False
+        self.freeze_timer = 0
+
     def start_good_echo(self, duration_base, duration_increment):
         self.good_echo_active = True
         if self.good_echo_current_duration is None:
             self.good_echo_current_duration = duration_base
         self.good_echo_timer = self.good_echo_current_duration
         self.good_echo_current_duration += duration_increment
+
+    def freeze_bad(self, duration_frames):
+        self.freeze_bad_echoes = True
+        self.freeze_timer = duration_frames
 
     def update(self, player_pos, screen):
         # Append player pos to recording
@@ -35,6 +42,12 @@ class EchoManager:
         else:
             self.good_echo_lag_queue.clear()
             self.good_echo_pos = None
+
+        # Handle freeze timer
+        if self.freeze_bad_echoes:
+            self.freeze_timer -= 1
+            if self.freeze_timer <= 0:
+                self.freeze_bad_echoes = False
 
         # Echo buffer flashing before spawning actual echo
         new_buffers = []
@@ -70,11 +83,16 @@ class EchoManager:
                     if echo_rect.colliderect(good_echo_rect):
                         continue
 
+                # Draw echoes
                 pygame.draw.rect(screen, RED, (*echo_pos, TILE_SIZE, TILE_SIZE))
 
-                surviving_echoes.append(path)
-                surviving_frames.append(self.echo_frames[i] + 1)
-
+                # Only advance frame if not frozen or if this is a good echo
+                if not self.freeze_bad_echoes:
+                    surviving_echoes.append(path)
+                    surviving_frames.append(self.echo_frames[i] + 1)
+                else:
+                    surviving_echoes.append(path)
+                    surviving_frames.append(self.echo_frames[i])
         self.echoes = surviving_echoes
         self.echo_frames = surviving_frames
 
