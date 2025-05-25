@@ -15,6 +15,7 @@ WHITE = (255, 255, 255)
 BLUE = (50, 100, 255)
 GREEN = (50, 255, 100)
 RED = (255, 50, 50)
+YELLOW = (255, 255, 0)
 GRAY = (30, 30, 30)
 
 # Font
@@ -28,9 +29,17 @@ dash_cooldown = 60
 dash_timer = 0
 
 # Echoes
-echoes = []           # List of deque paths
+echoes = []           # List of paths (list of Vector2)
 echo_frames = []      # Current frame index in each echo path
 recording = []        # Current round's player path
+
+# Good Echo
+good_echo_active = False
+good_echo_pos = None
+good_echo_timer = 0
+GOOD_ECHO_LAG_FRAMES = 80  # increased lag for more delay
+GOOD_ECHO_DURATION_FRAMES = 20 * 60  # 20 seconds at 60 FPS
+good_echo_lag_queue = deque()  # store player positions for lagging
 
 # Artifact
 def random_artifact_position():
@@ -45,7 +54,6 @@ collected = False
 round_number = 1
 running = True
 
-# Loop
 while running:
     screen.fill(GRAY)
     keys = pygame.key.get_pressed()
@@ -74,6 +82,16 @@ while running:
     player_pos += move * current_speed
     recording.append(player_pos.copy())
 
+    # Update good echo lag queue if active
+    if good_echo_active:
+        good_echo_lag_queue.append(player_pos.copy())
+        # Maintain lag queue size
+        while len(good_echo_lag_queue) > GOOD_ECHO_LAG_FRAMES:
+            good_echo_pos = good_echo_lag_queue.popleft()
+    else:
+        good_echo_lag_queue.clear()
+        good_echo_pos = None
+
     # Draw artifact and check collection
     if not collected:
         pygame.draw.rect(screen, GREEN, (*artifact_pos, TILE_SIZE, TILE_SIZE))
@@ -81,21 +99,38 @@ while running:
             pygame.Rect(artifact_pos.x, artifact_pos.y, TILE_SIZE, TILE_SIZE)
         ):
             collected = True
-            # Create a full back-and-forth loop path
+            # Create a full back-and-forth loop path for bad echo
             loop_path = recording + recording[::-1]
             echoes.append(loop_path)
             echo_frames.append(0)
+
+            # Every 4th round, activate good echo
+            if round_number % 4 == 0:
+                good_echo_active = True
+                good_echo_timer = GOOD_ECHO_DURATION_FRAMES
+                # Do NOT reset good_echo_pos here, lag queue will handle smooth follow
 
             recording = []
             round_number += 1
             artifact_pos = random_artifact_position()
 
-    # Draw echoes
+    # Update and draw echoes (bad echoes)
+    surviving_echoes = []
+    surviving_frames = []
     for i in range(len(echoes)):
         path = echoes[i]
         if len(path) > 0:
             index = echo_frames[i] % len(path)  # loop forever
             echo_pos = path[index]
+
+            # If good echo touches this echo, destroy it
+            if good_echo_active and good_echo_pos:
+                echo_rect = pygame.Rect(echo_pos.x, echo_pos.y, TILE_SIZE, TILE_SIZE)
+                good_echo_rect = pygame.Rect(good_echo_pos.x, good_echo_pos.y, TILE_SIZE, TILE_SIZE)
+                if echo_rect.colliderect(good_echo_rect):
+                    # Destroy this echo (skip adding it to surviving list)
+                    continue
+
             pygame.draw.rect(screen, RED, (*echo_pos, TILE_SIZE, TILE_SIZE))
 
             # Collision with player
@@ -106,6 +141,23 @@ while running:
                 running = False
 
             echo_frames[i] += 1
+            surviving_echoes.append(path)
+            surviving_frames.append(echo_frames[i])
+
+    echoes = surviving_echoes
+    echo_frames = surviving_frames
+
+    # Update good echo timer and deactivate if time's up
+    if good_echo_active:
+        good_echo_timer -= 1
+        if good_echo_timer <= 0:
+            good_echo_active = False
+            good_echo_pos = None
+            good_echo_lag_queue.clear()
+
+    # Draw good echo as single yellow block if active
+    if good_echo_active and good_echo_pos:
+        pygame.draw.rect(screen, YELLOW, (*good_echo_pos, TILE_SIZE, TILE_SIZE))
 
     # Draw player
     pygame.draw.rect(screen, BLUE, (*player_pos, TILE_SIZE, TILE_SIZE))
@@ -117,6 +169,8 @@ while running:
     # UI
     screen.blit(font.render(f"Round: {round_number}", True, WHITE), (10, 10))
     screen.blit(font.render(f"Dash: {'Ready' if dash_timer == 0 else 'Cooling'}", True, WHITE), (10, 30))
+    if good_echo_active:
+        screen.blit(font.render("Good Echo Active!", True, YELLOW), (10, 50))
 
     pygame.display.flip()
     clock.tick(60)
