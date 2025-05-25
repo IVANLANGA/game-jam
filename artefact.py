@@ -7,9 +7,28 @@ class Artefact:
         self.pos = start_pos
         self.collected = False
 
+        # Load sprite sheet and extract frames
+        self.sprite_sheet = pygame.image.load("assets/img/artefact.png").convert_alpha()
+        self.frames = []
+        for i in range(4):
+            frame = self.sprite_sheet.subsurface(pygame.Rect(i * 16, 0, 16, 16))
+            # Scale frame to TILE_SIZE if needed
+            if TILE_SIZE != 16:
+                frame = pygame.transform.scale(frame, (TILE_SIZE, TILE_SIZE))
+            self.frames.append(frame)
+        self.current_frame = 0
+        self.frame_timer = 0
+        self.frame_delay = 8  # Change frame every 8 ticks
+
     def draw(self, screen):
         if not self.collected:
-            pygame.draw.rect(screen, GREEN, (*self.pos, TILE_SIZE, TILE_SIZE))
+            # Animate
+            self.frame_timer += 1
+            if self.frame_timer >= self.frame_delay:
+                self.frame_timer = 0
+                self.current_frame = (self.current_frame + 1) % len(self.frames)
+            # Draw current frame
+            screen.blit(self.frames[self.current_frame], self.pos)
 
     def check_collection(self, player_pos):
         if not self.collected:

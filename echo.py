@@ -14,7 +14,8 @@ class EchoManager:
         self.good_echo_pos = None
         self.good_echo_timer = 0
         self.good_echo_current_duration = None
-        self.good_echo_lag_queue = deque()
+        self.good_echo_target_idx = None  # Index of the echo being hunted
+        self.good_echo_speed = 3  # Pixels per frame, adjust as needed
 
         self.freeze_bad_echoes = False
         self.freeze_timer = 0
@@ -25,6 +26,9 @@ class EchoManager:
             self.good_echo_current_duration = duration_base
         self.good_echo_timer = self.good_echo_current_duration
         self.good_echo_current_duration += duration_increment
+        # Place good echo at player's current position at activation
+        self.good_echo_pos = None  # Will be set in update
+        self.good_echo_target_idx = None
 
     def freeze_bad(self, duration_frames):
         self.freeze_bad_echoes = True
@@ -34,14 +38,46 @@ class EchoManager:
         # Append player pos to recording
         self.recording.append(player_pos.copy())
 
-        # Good echo lag logic
+        # Good echo hunting logic
         if self.good_echo_active:
-            self.good_echo_lag_queue.append(player_pos.copy())
-            while len(self.good_echo_lag_queue) > GOOD_ECHO_LAG_FRAMES:
-                self.good_echo_pos = self.good_echo_lag_queue.popleft()
+            if self.good_echo_pos is None:
+                # Spawn at player position on activation
+                self.good_echo_pos = player_pos.copy()
+            # Find nearest bad echo to hunt
+            if self.echoes:
+                # Find closest echo
+                min_dist = float('inf')
+                target_idx = None
+                target_pos = None
+                for i, path in enumerate(self.echoes):
+                    if len(path) > 0:
+                        idx = self.echo_frames[i] % len(path)
+                        echo_pos = path[idx]
+                        dist = self.good_echo_pos.distance_to(echo_pos)
+                        if dist < min_dist:
+                            min_dist = dist
+                            target_idx = i
+                            target_pos = echo_pos
+                self.good_echo_target_idx = target_idx
+                # Move good echo towards target
+                if target_pos is not None:
+                    direction = (target_pos - self.good_echo_pos)
+                    if direction.length() > 0:
+                        direction = direction.normalize()
+                        self.good_echo_pos += direction * self.good_echo_speed
+                    # Check collision with target echo
+                    good_echo_rect = pygame.Rect(self.good_echo_pos.x, self.good_echo_pos.y, TILE_SIZE, TILE_SIZE)
+                    echo_rect = pygame.Rect(target_pos.x, target_pos.y, TILE_SIZE, TILE_SIZE)
+                    if good_echo_rect.colliderect(echo_rect):
+                        # Remove the bad echo
+                        del self.echoes[target_idx]
+                        del self.echo_frames[target_idx]
+                        self.good_echo_target_idx = None
+            else:
+                self.good_echo_target_idx = None
         else:
-            self.good_echo_lag_queue.clear()
             self.good_echo_pos = None
+            self.good_echo_target_idx = None
 
         # Handle freeze timer
         if self.freeze_bad_echoes:
@@ -77,16 +113,10 @@ class EchoManager:
                 index = self.echo_frames[i] % len(path)
                 echo_pos = path[index]
 
-                if self.good_echo_active and self.good_echo_pos:
-                    echo_rect = pygame.Rect(echo_pos.x, echo_pos.y, TILE_SIZE, TILE_SIZE)
-                    good_echo_rect = pygame.Rect(self.good_echo_pos.x, self.good_echo_pos.y, TILE_SIZE, TILE_SIZE)
-                    if echo_rect.colliderect(good_echo_rect):
-                        continue
-
                 # Draw echoes
                 pygame.draw.rect(screen, RED, (*echo_pos, TILE_SIZE, TILE_SIZE))
 
-                # Only advance frame if not frozen or if this is a good echo
+                # Only advance frame if not frozen
                 if not self.freeze_bad_echoes:
                     surviving_echoes.append(path)
                     surviving_frames.append(self.echo_frames[i] + 1)
@@ -102,7 +132,7 @@ class EchoManager:
             if self.good_echo_timer <= 0:
                 self.good_echo_active = False
                 self.good_echo_pos = None
-                self.good_echo_lag_queue.clear()
+                self.good_echo_target_idx = None
 
         # Draw good echo
         if self.good_echo_active and self.good_echo_pos:
