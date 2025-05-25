@@ -74,6 +74,7 @@ def main():
         player = Player(pygame.Vector2(5 * TILE_SIZE, 5 * TILE_SIZE))
         artefact = Artefact(pygame.Vector2(5 * TILE_SIZE, 8 * TILE_SIZE))
         echoes = EchoManager()
+        echoes.set_sounds(sounds)
 
         round_number = 1
         running = True

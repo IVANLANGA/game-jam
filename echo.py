@@ -117,6 +117,11 @@ class EchoManager:
         self.friend_anim_frame = 0
         self.friend_last_direction = "down"
 
+        self.sounds = None  # Will be set from main
+
+    def set_sounds(self, sounds):
+        self.sounds = sounds
+
     def start_good_echo(self, duration_base, duration_increment):
         self.good_echo_active = True
         if self.good_echo_current_duration is None:
@@ -165,7 +170,9 @@ class EchoManager:
                     good_echo_rect = pygame.Rect(self.good_echo_pos.x, self.good_echo_pos.y, TILE_SIZE, TILE_SIZE)
                     echo_rect = pygame.Rect(target_pos.x, target_pos.y, TILE_SIZE, TILE_SIZE)
                     if good_echo_rect.colliderect(echo_rect):
-                        # Remove the bad echo
+                        # Play attack sound if available
+                        if self.sounds and "attack" in self.sounds:
+                            self.sounds["attack"].play()
                         del self.echoes[target_idx]
                         del self.echo_frames[target_idx]
                         self.good_echo_target_idx = None
