@@ -1,6 +1,8 @@
 import pygame
 from settings import PLAYER_SPEED, DASH_SPEED, DASH_DURATION, DASH_COOLDOWN, TILE_SIZE, WIDTH, HEIGHT
 
+PLAYER_DRAW_SIZE = TILE_SIZE * 2  # Add this line
+
 class Player:
     def __init__(self, start_pos):
         self.pos = start_pos
@@ -31,9 +33,8 @@ class Player:
             for i in range(self.frames_per_row):
                 rect = pygame.Rect(i * self.frame_width, y, self.frame_width, self.frame_height)
                 frame = self.sprite_sheet.subsurface(rect)
-                # Scale to TILE_SIZE if needed
-                if TILE_SIZE != self.frame_width:
-                    frame = pygame.transform.scale(frame, (TILE_SIZE, TILE_SIZE))
+                # Scale to PLAYER_DRAW_SIZE (2x) instead of TILE_SIZE
+                frame = pygame.transform.scale(frame, (PLAYER_DRAW_SIZE, PLAYER_DRAW_SIZE))
                 frames.append(frame)
             self.animations[dir_name] = frames
 
@@ -81,9 +82,9 @@ class Player:
             self.dash_cooldown_timer -= 1
 
         self.pos += move * current_speed
-        # Keep inside bounds
-        self.pos.x = max(0, min(WIDTH - TILE_SIZE, self.pos.x))
-        self.pos.y = max(0, min(HEIGHT - TILE_SIZE, self.pos.y))
+        # Keep inside bounds (adjust for new draw size)
+        self.pos.x = max(0, min(WIDTH - PLAYER_DRAW_SIZE, self.pos.x))
+        self.pos.y = max(0, min(HEIGHT - PLAYER_DRAW_SIZE, self.pos.y))
 
         # Animation update
         if self.moving:
