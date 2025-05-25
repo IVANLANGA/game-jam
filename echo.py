@@ -30,6 +30,38 @@ class EnemySpriteManager:
     def get_frame(self, direction, frame_idx):
         return self.animations[direction][frame_idx % self.frames_per_row]
 
+# --- Friend (Good Echo) Sprite Manager ---
+class FriendSpriteManager:
+    def __init__(self):
+        self.sprite_sheet = pygame.image.load("assets/img/friend.png").convert_alpha()
+        self.frame_width = 64
+        self.frame_height = 64
+        self.frames_per_row = 8  # 8 frames per row as per your new info
+        self.directions = ["down", "left", "right", "up"]
+        self.row_map = {
+            "down": 0,
+            "left": 64,
+            "right": 128,
+            "up": 192,
+        }
+        self.animations = {}
+        sheet_width, sheet_height = self.sprite_sheet.get_size()
+        scale = 2  # Scale friend sprites 2x
+        for dir_name in self.directions:
+            y = self.row_map[dir_name]
+            frames = []
+            for i in range(self.frames_per_row):
+                rect = pygame.Rect(i * self.frame_width, y, self.frame_width, self.frame_height)
+                # Only add frame if within bounds
+                if rect.right <= sheet_width and rect.bottom <= sheet_height:
+                    frame = self.sprite_sheet.subsurface(rect)
+                    frame = pygame.transform.scale(frame, (self.frame_width * scale, self.frame_height * scale))
+                    frames.append(frame)
+            self.animations[dir_name] = frames
+
+    def get_frame(self, direction, frame_idx):
+        return self.animations[direction][frame_idx % self.frames_per_row]
+
 def get_direction_from_path(path, idx):
     # Returns "down", "up", "right", or "left" based on movement vector
     if len(path) < 2:
@@ -42,6 +74,13 @@ def get_direction_from_path(path, idx):
         curr = path[idx]
     dx = curr.x - prev.x
     dy = curr.y - prev.y
+    if abs(dx) > abs(dy):
+        return "right" if dx > 0 else "left"
+    else:
+        return "down" if dy > 0 else "up"
+
+def get_direction_from_vector(vec):
+    dx, dy = vec.x, vec.y
     if abs(dx) > abs(dy):
         return "right" if dx > 0 else "left"
     else:
@@ -71,13 +110,19 @@ class EchoManager:
         self.enemy_anim_delay = 6  # Adjust for animation speed
         self.enemy_anim_frame = 0
 
+        # --- Friend sprite animation ---
+        self.friend_sprites = FriendSpriteManager()
+        self.friend_anim_timer = 0
+        self.friend_anim_delay = 6
+        self.friend_anim_frame = 0
+        self.friend_last_direction = "down"
+
     def start_good_echo(self, duration_base, duration_increment):
         self.good_echo_active = True
         if self.good_echo_current_duration is None:
             self.good_echo_current_duration = duration_base
         self.good_echo_timer = self.good_echo_current_duration
         self.good_echo_current_duration += duration_increment
-        # Place good echo at player's current position at activation
         self.good_echo_pos = None  # Will be set in update
         self.good_echo_target_idx = None
 
@@ -90,13 +135,12 @@ class EchoManager:
         self.recording.append(player_pos.copy())
 
         # Good echo hunting logic
+        friend_direction_vec = pygame.Vector2(0, 1)  # Default down
         if self.good_echo_active:
             if self.good_echo_pos is None:
-                # Spawn at player position on activation
                 self.good_echo_pos = player_pos.copy()
             # Find nearest bad echo to hunt
             if self.echoes:
-                # Find closest echo
                 min_dist = float('inf')
                 target_idx = None
                 target_pos = None
@@ -114,6 +158,7 @@ class EchoManager:
                 if target_pos is not None:
                     direction = (target_pos - self.good_echo_pos)
                     if direction.length() > 0:
+                        friend_direction_vec = direction
                         direction = direction.normalize()
                         self.good_echo_pos += direction * self.good_echo_speed
                     # Check collision with target echo
@@ -162,6 +207,12 @@ class EchoManager:
                 self.enemy_anim_timer = 0
                 self.enemy_anim_frame = (self.enemy_anim_frame + 1) % self.enemy_sprites.frames_per_row
 
+        # --- Animate friend (good echo) frames ---
+        self.friend_anim_timer += 1
+        if self.friend_anim_timer >= self.friend_anim_delay:
+            self.friend_anim_timer = 0
+            self.friend_anim_frame = (self.friend_anim_frame + 1) % self.friend_sprites.frames_per_row
+
         # Update and draw echoes
         surviving_echoes = []
         surviving_frames = []
@@ -198,9 +249,14 @@ class EchoManager:
                 self.good_echo_pos = None
                 self.good_echo_target_idx = None
 
-        # Draw good echo
+        # Draw good echo as animated sprite
         if self.good_echo_active and self.good_echo_pos:
-            pygame.draw.rect(screen, YELLOW, (*self.good_echo_pos, TILE_SIZE, TILE_SIZE))
+            direction = get_direction_from_vector(friend_direction_vec)
+            self.friend_last_direction = direction
+            frame = self.friend_sprites.get_frame(direction, self.friend_anim_frame)
+            sprite_rect = frame.get_rect()
+            sprite_rect.center = (self.good_echo_pos.x + TILE_SIZE // 2, self.good_echo_pos.y + TILE_SIZE // 2)
+            screen.blit(frame, sprite_rect)
 
     def add_echo_buffer(self, loop_path, pos):
         self.echo_buffers.append({
