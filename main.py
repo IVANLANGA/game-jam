@@ -160,6 +160,7 @@ def main():
                 if echoes.freeze_bad_echoes:
                     screen.blit(font.render("Freeze Active!", True, BLUE), (10, 110))
 
+                apply_crt_filter(screen)
                 pygame.display.flip()
                 clock.tick(60)
             elif game_state == "game_over":
@@ -182,6 +183,37 @@ def main():
                     break
 
     pygame.quit()
+
+def apply_crt_filter(screen):
+    """Draws a CRT overlay with scanlines and optional tint."""
+    width, height = screen.get_size()
+    crt_overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    # --- Scanlines ---
+    scanline_color = (0, 0, 0, 40)  # Semi-transparent black
+    scanline_spacing = 2
+    for y in range(0, height, scanline_spacing):
+        pygame.draw.line(crt_overlay, scanline_color, (0, y), (width, y))
+
+    # --- Color tint (subtle blue/green) ---
+    tint_color = (30, 60, 80, 25) 
+    tint_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    tint_surface.fill(tint_color)
+    crt_overlay.blit(tint_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+    # --- Curved border (simulate barrel distortion) ---
+    border_color = (0, 0, 0, 60)
+    border_width = 24
+    pygame.draw.rect(crt_overlay, border_color, (0, 0, width, height), border_width, border_radius=60)
+
+    
+    small = pygame.transform.smoothscale(screen, (width//2, height//2))
+    bloom = pygame.transform.smoothscale(small, (width, height))
+    bloom.set_alpha(40)
+    screen.blit(bloom, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+   
+    screen.blit(crt_overlay, (0, 0))
 
 class GameOverAnimation:
     def __init__(self, screen):
