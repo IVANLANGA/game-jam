@@ -1,14 +1,15 @@
 import pygame
 from collections import deque
+import random
 
-# Initialize
+# Init
 pygame.init()
 WIDTH, HEIGHT = 640, 480
 TILE_SIZE = 32
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Echo Dash")
 
-# Clock and Colors
+# Clock & Colors
 clock = pygame.time.Clock()
 WHITE = (255, 255, 255)
 BLUE = (50, 100, 255)
@@ -16,30 +17,35 @@ GREEN = (50, 255, 100)
 RED = (255, 50, 50)
 GRAY = (30, 30, 30)
 
-# Player settings
+# Font
+font = pygame.font.SysFont("consolas", 20)
+
+# Player
 player_pos = pygame.Vector2(5 * TILE_SIZE, 5 * TILE_SIZE)
 player_speed = 2
 dash_speed = 6
-dash_cooldown = 60  # frames
+dash_cooldown = 60
 dash_timer = 0
 
-# Echo replay data
-echo_path = deque()
-echo_pos = None
-echo_frame = 0
+# Echoes
+echoes = []           # List of deque paths
+echo_frames = []      # Current frame index in each echo path
+recording = []        # Current round's player path
 
 # Artifact
-artifact_pos = pygame.Vector2(12 * TILE_SIZE, 8 * TILE_SIZE)
+def random_artifact_position():
+    grid_x = random.randint(1, (WIDTH - TILE_SIZE) // TILE_SIZE - 1)
+    grid_y = random.randint(1, (HEIGHT - TILE_SIZE) // TILE_SIZE - 1)
+    return pygame.Vector2(grid_x * TILE_SIZE, grid_y * TILE_SIZE)
+
+artifact_pos = random_artifact_position()
 collected = False
 
-# Fonts
-font = pygame.font.SysFont("consolas", 20)
-
-# Game State
+# Game state
+round_number = 1
 running = True
-recording = []
-game_phase = 1  # Phase 1: playing, Phase 2+: echo mode
 
+# Loop
 while running:
     screen.fill(GRAY)
     keys = pygame.key.get_pressed()
@@ -61,44 +67,56 @@ while running:
     if keys[pygame.K_z] and dash_timer == 0:
         current_speed = dash_speed
         dash_timer = dash_cooldown
-
-    player_pos += move * current_speed
     if dash_timer > 0:
         dash_timer -= 1
 
-    # Draw player
-    pygame.draw.rect(screen, BLUE, (*player_pos, TILE_SIZE, TILE_SIZE))
-
-    # Record movement
+    # Update player
+    player_pos += move * current_speed
     recording.append(player_pos.copy())
 
-    # Draw artifact
+    # Draw artifact and check collection
     if not collected:
         pygame.draw.rect(screen, GREEN, (*artifact_pos, TILE_SIZE, TILE_SIZE))
         if pygame.Rect(player_pos.x, player_pos.y, TILE_SIZE, TILE_SIZE).colliderect(
             pygame.Rect(artifact_pos.x, artifact_pos.y, TILE_SIZE, TILE_SIZE)
         ):
             collected = True
-            echo_path = deque(recording)  # save for ghost
-            echo_frame = 0
-            game_phase += 1
-            recording = []
+            # Create a full back-and-forth loop path
+            loop_path = recording + recording[::-1]
+            echoes.append(loop_path)
+            echo_frames.append(0)
 
-    # Echo ghost
-    if game_phase > 1 and echo_path:
-        if echo_frame < len(echo_path):
-            echo_pos = echo_path[echo_frame]
+            recording = []
+            round_number += 1
+            artifact_pos = random_artifact_position()
+
+    # Draw echoes
+    for i in range(len(echoes)):
+        path = echoes[i]
+        if len(path) > 0:
+            index = echo_frames[i] % len(path)  # loop forever
+            echo_pos = path[index]
             pygame.draw.rect(screen, RED, (*echo_pos, TILE_SIZE, TILE_SIZE))
+
+            # Collision with player
             if pygame.Rect(player_pos.x, player_pos.y, TILE_SIZE, TILE_SIZE).colliderect(
                 pygame.Rect(echo_pos.x, echo_pos.y, TILE_SIZE, TILE_SIZE)
             ):
-                print("Game Over! You touched your echo.")
+                print(f"Game Over! Touched echo from Round {i + 1}")
                 running = False
-            echo_frame += 1
+
+            echo_frames[i] += 1
+
+    # Draw player
+    pygame.draw.rect(screen, BLUE, (*player_pos, TILE_SIZE, TILE_SIZE))
+
+    # Reset artifact flag after drawing and logic
+    if collected:
+        collected = False
 
     # UI
-    dash_text = f"Dash: {'Ready' if dash_timer == 0 else 'Cooling'}"
-    screen.blit(font.render(dash_text, True, WHITE), (10, 10))
+    screen.blit(font.render(f"Round: {round_number}", True, WHITE), (10, 10))
+    screen.blit(font.render(f"Dash: {'Ready' if dash_timer == 0 else 'Cooling'}", True, WHITE), (10, 30))
 
     pygame.display.flip()
     clock.tick(60)
