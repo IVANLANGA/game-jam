@@ -16,7 +16,7 @@ class EnemySpriteManager:
             "left": 96,
         }
         self.animations = {}
-        scale = 2  # Scale enemy sprites 2x
+        scale = 2 
         for dir_name in self.directions:
             y = self.row_map[dir_name]
             frames = []
@@ -36,7 +36,7 @@ class FriendSpriteManager:
         self.sprite_sheet = pygame.image.load("assets/img/friend.png").convert_alpha()
         self.frame_width = 64
         self.frame_height = 64
-        self.frames_per_row = 8  # 8 frames per row as per your new info
+        self.frames_per_row = 8  
         self.directions = ["down", "left", "right", "up"]
         self.row_map = {
             "down": 0,
@@ -46,7 +46,7 @@ class FriendSpriteManager:
         }
         self.animations = {}
         sheet_width, sheet_height = self.sprite_sheet.get_size()
-        scale = 2  # Scale friend sprites 2x
+        scale = 2  
         for dir_name in self.directions:
             y = self.row_map[dir_name]
             frames = []

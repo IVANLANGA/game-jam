@@ -1,6 +1,6 @@
 import pygame
 
-WIDTH, HEIGHT = 640, 480
+WIDTH, HEIGHT = 1200, 800
 TILE_SIZE = 32
 
 WHITE = (255, 255, 255)
@@ -9,7 +9,7 @@ GREEN = (50, 255, 100)
 RED = (255, 50, 50)
 YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
-GRAY = (30, 30, 30)
+GRAY = (100, 100, 100)
 
 FONT_SIZE = 20
 

@@ -86,7 +86,7 @@ def main():
         game_over_anim = None
         game_over_timer = 0
 
-        # Add these variables to control good echo spawn interval
+        
         good_echo_spawn_interval = 4  # Initial interval in rounds
         good_echo_next_spawn = good_echo_spawn_interval
 
@@ -146,10 +146,10 @@ def main():
                     game_state = "game_over"
                     continue
 
-                # Draw player
+               #UI
                 player.draw(screen)
 
-                # UI
+               
                 screen.blit(font.render(f"Round: {round_number}", True, WHITE), (10, 10))
                 dash_status = "Ready" if player.dash_cooldown_timer == 0 else f"Wait ({player.dash_cooldown_timer // 60}s)"
                 screen.blit(font.render(f"Dash: {dash_status}", True, WHITE), (10, 30))
@@ -167,7 +167,8 @@ def main():
                 if game_over_anim:
                     game_over_anim.update()
                     game_over_anim.draw()
-                # Optionally show "Game Over" text
+             
+             
                 text = font.render("Game Over!", True, RED)
                 screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 + 80))
                 pygame.display.flip()
